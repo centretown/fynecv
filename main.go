@@ -8,6 +8,7 @@ import (
 
 	"fynecv/cv"
 	"fynecv/hass"
+	"fynecv/ui"
 	"fynecv/web"
 
 	"fyne.io/fyne/v2"
@@ -32,73 +33,34 @@ func main() {
 }
 
 func run(win fyne.Window) {
-	var devices = []*cv.Device{
-		cv.NewDevice(0, gocv.VideoCaptureV4L),
-		cv.NewDevice("http://192.168.0.25:8080", gocv.VideoCaptureAny),
+	var cameras = []*cv.Camera{
+		cv.NewCamera(0, gocv.VideoCaptureV4L),
+		cv.NewCamera("http://192.168.0.25:8080", gocv.VideoCaptureAny),
 	}
 
 	mainImage := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 1280, 720)))
 	mainImage.FillMode = canvas.ImageFillContain
-	mainHook := NewFyneHook(mainImage)
-	list := newList(devices, mainHook)
+	mainHook := ui.NewFyneHook(mainImage)
+	cameraList := ui.NewCameraList(cameras, mainHook)
+	lightList := ui.NewLightList([]string{
+		"light.led_matrix_24",
+		"light.led_strip_24"})
 
-	ctr := container.NewBorder(nil, nil, nil, list, newView(mainImage))
+	accord := ui.NewAccordianList(lightList)
+	ctr := container.NewBorder(nil, nil, accord, cameraList, newView(mainImage))
 	win.SetContent(ctr)
 
-	go web.Serve(devices)
+	go web.Serve(cameras)
 
 	win.SetCloseIntercept(func() {
-		for _, device := range devices {
+		for _, device := range cameras {
 			device.Quit <- 1
 		}
 		win.Close()
 	})
 
-	win.Resize(fyne.NewSize(1280, 960))
+	win.Resize(fyne.NewSize(1280+250, 768+100))
 	win.ShowAndRun()
-}
-
-func newList(devices []*cv.Device, mainHook cv.UiHook) fyne.CanvasObject {
-
-	bound := binding.NewUntypedList()
-	// classify := cv.NewClassifyHook()
-
-	for _, device := range devices {
-		device.MainHook = mainHook
-		device.ThumbHook = NewFyneHook(nil)
-		device.StreamHook = cv.NewStreamHook()
-		// device.AddFilter(classify)
-		bound.Append(device)
-	}
-
-	list := widget.NewListWithData(
-		bound,
-		func() fyne.CanvasObject {
-			imageBox := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 240, 200)))
-			imageBox.FillMode = canvas.ImageFillContain
-			imageBox.SetMinSize(fyne.NewSize(240, 200))
-			return imageBox
-		},
-		func(i binding.DataItem, o fyne.CanvasObject) {
-			d, _ := i.(binding.Untyped).Get()
-			device, _ := d.(*cv.Device)
-			device.ThumbHook.SetUi(o)
-		},
-	)
-
-	current := 0
-	devices[current].ShowMain = true
-
-	list.OnSelected = func(id widget.ListItemID) {
-		if id != current {
-			log.Println("selected", id)
-			devices[current].RemoveMain()
-			current = id
-			devices[current].AddMain(mainHook)
-		}
-	}
-
-	return list
 }
 
 type ViewData struct {
@@ -112,9 +74,10 @@ func newView(view fyne.CanvasObject) fyne.CanvasObject {
 	viewData.panValue = binding.NewFloat()
 	viewData.panValue.Set(90)
 	viewData.tiltValue = binding.NewFloat()
-	viewData.tiltValue.Set(90)
+	viewData.tiltValue.Set(50)
+
 	pan := widget.NewSliderWithData(0, 180, viewData.panValue)
-	tilt := widget.NewSliderWithData(0, 180, viewData.tiltValue)
+	tilt := widget.NewSliderWithData(0, 100, viewData.tiltValue)
 	tilt.Orientation = widget.Vertical
 	ctr := container.NewBorder(nil,
 		pan,
@@ -134,5 +97,7 @@ func newView(view fyne.CanvasObject) fyne.CanvasObject {
 		hass.Post("services/light/turn_on", cmd)
 		log.Println(value)
 	}))
+	pan.Hide()
+	tilt.Hide()
 	return ctr
 }

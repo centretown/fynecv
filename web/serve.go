@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-func Serve(devices []*cv.Device) {
+func Serve(devices []*cv.Camera) {
 	// var (
 	// 	webCam = cv.NewDevice(0, gocv.VideoCaptureV4L)
 	// 	ipCam  = cv.NewDevice("http://192.168.0.25:8080", gocv.VideoCaptureAny)

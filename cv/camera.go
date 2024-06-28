@@ -25,18 +25,18 @@ func (cmd Verb) String() string {
 	return cmdList[cmd]
 }
 
-type DeviceCmd struct {
+type CameraCmd struct {
 	Action   Verb
 	Property gocv.VideoCaptureProperties
 	Value    any
 }
 
-type Device struct {
+type Camera struct {
 	ID  any
 	API gocv.VideoCaptureAPI
 
 	Quit chan int
-	Cmd  chan DeviceCmd
+	Cmd  chan CameraCmd
 
 	StreamHook *StreamHook
 	ThumbHook  UiHook
@@ -50,12 +50,12 @@ type Device struct {
 	ShowMain    bool
 }
 
-func NewDevice(id any, api gocv.VideoCaptureAPI) *Device {
-	dev := &Device{
+func NewCamera(id any, api gocv.VideoCaptureAPI) *Camera {
+	dev := &Camera{
 		ID:         id,
 		API:        api,
 		Quit:       make(chan int),
-		Cmd:        make(chan DeviceCmd),
+		Cmd:        make(chan CameraCmd),
 		StreamHook: NewStreamHook(),
 		Filters:    make([]Hook, 0),
 
@@ -66,21 +66,21 @@ func NewDevice(id any, api gocv.VideoCaptureAPI) *Device {
 	return dev
 }
 
-func (dev *Device) AddFilter(filter Hook) {
+func (dev *Camera) AddFilter(filter Hook) {
 	dev.Filters = append(dev.Filters, filter)
 }
 
-func (dev *Device) RemoveMain() {
-	devCmd := DeviceCmd{Action: RemoveHook, Value: 0}
+func (dev *Camera) RemoveMain() {
+	devCmd := CameraCmd{Action: RemoveHook, Value: 0}
 	dev.Cmd <- devCmd
 }
 
-func (dev *Device) AddMain(hook Hook) {
-	devCmd := DeviceCmd{Action: AddHook, Value: hook}
+func (dev *Camera) AddMain(hook Hook) {
+	devCmd := CameraCmd{Action: AddHook, Value: hook}
 	dev.Cmd <- devCmd
 }
 
-func (dev *Device) do(cmd DeviceCmd) {
+func (dev *Camera) do(cmd CameraCmd) {
 	switch cmd.Action {
 	case Get:
 		cmd.Value = dev.capture.Get(cmd.Property)
@@ -95,7 +95,7 @@ func (dev *Device) do(cmd DeviceCmd) {
 
 }
 
-func (dev *Device) Open() (err error) {
+func (dev *Camera) Open() (err error) {
 	var (
 		useAPI = dev.API > 0
 	)
@@ -123,7 +123,7 @@ func (dev *Device) Open() (err error) {
 	return
 }
 
-func (dev *Device) Close() {
+func (dev *Camera) Close() {
 	// for i, hook := range dev.Hooks {
 	// 	hook.Close(0)
 	// 	log.Println("Closed hook", i)
@@ -134,10 +134,10 @@ func (dev *Device) Close() {
 	log.Println("Closed device", dev.ID)
 }
 
-func (dev *Device) Capture() {
+func (dev *Camera) Capture() {
 	var (
 		img   gocv.Mat
-		cmd   DeviceCmd
+		cmd   CameraCmd
 		retry int = 0
 	)
 
