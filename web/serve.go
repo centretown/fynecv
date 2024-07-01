@@ -2,28 +2,23 @@ package web
 
 import (
 	"fmt"
-	"fynecv/cv"
+	"fynecv/vision"
 	"log"
 	"net/http"
 )
 
-func Serve(devices []*cv.Camera) {
-	// var (
-	// 	webCam = cv.NewDevice(0, gocv.VideoCaptureV4L)
-	// 	ipCam  = cv.NewDevice("http://192.168.0.25:8080", gocv.VideoCaptureAny)
-	// )
+func Serve(cameras []*vision.Camera) {
+	const url = "192.168.0.7:9000"
 
-	for i, device := range devices {
+	for i, camera := range cameras {
 		path := "/"
 		if i > 0 {
 			path = fmt.Sprintf("/%d/", i)
 		}
-		http.Handle(path, device.StreamHook.Stream)
-		go device.Capture()
+		http.Handle(path, camera.StreamHook.Stream)
+		go camera.Serve()
+		log.Printf("Serving %s @%s%s\n", camera.Name, url, path)
 	}
-
-	url := "192.168.0.7:9000"
-	fmt.Println("Capturing. Point your browser to " + url)
 
 	server := &http.Server{
 		Addr:         url,

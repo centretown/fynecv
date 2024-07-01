@@ -13,7 +13,7 @@ const api = "/api/"
 
 func Get(cmd string) (buf []byte, err error) {
 
-	log.Printf("\n\n%s\n", cmd)
+	log.Printf("%s", cmd)
 	req, err := http.NewRequest("GET", host+api+cmd, nil)
 	if err != nil {
 		log.Println(err, "GET")
@@ -24,7 +24,7 @@ func Get(cmd string) (buf []byte, err error) {
 }
 
 func Post(cmd string, body string) ([]byte, error) {
-	log.Printf("\n%s\n%s\n", cmd, body)
+	log.Printf("%s->%s\n", cmd, body)
 	buf := bytes.NewBuffer(([]byte)(body))
 
 	req, err := http.NewRequest("POST", host+api+cmd, buf)

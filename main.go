@@ -2,22 +2,14 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"image"
-	"log"
 
-	"fynecv/cv"
-	"fynecv/hass"
+	"fynecv/appdata"
 	"fynecv/ui"
 	"fynecv/web"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
-	"fyne.io/fyne/v2/widget"
-	"gocv.io/x/gocv"
 )
 
 const APPID = "com.centretown.fynecv.preferences"
@@ -33,27 +25,23 @@ func main() {
 }
 
 func run(win fyne.Window) {
-	var cameras = []*cv.Camera{
-		cv.NewCamera(0, gocv.VideoCaptureV4L),
-		cv.NewCamera("http://192.168.0.25:8080", gocv.VideoCaptureAny),
-	}
+	data := appdata.NewAppData()
+	view := NewView(data)
+	mainHook := ui.NewFyneHook(view.Image)
+	cameraList := ui.NewCameraList(data.Cameras, mainHook)
+	lightPanel := ui.NewLightPanel(data)
+	// accord := ui.NewAccordianList(lightList)
 
-	mainImage := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 1280, 720)))
-	mainImage.FillMode = canvas.ImageFillContain
-	mainHook := ui.NewFyneHook(mainImage)
-	cameraList := ui.NewCameraList(cameras, mainHook)
-	lightList := ui.NewLightList([]string{
-		"light.led_matrix_24",
-		"light.led_strip_24"})
+	// vbox := container.NewVBox(cameraList, lightList)
 
-	accord := ui.NewAccordianList(lightList)
-	ctr := container.NewBorder(nil, nil, accord, cameraList, newView(mainImage))
+	ctr := container.NewBorder(lightPanel.Tabs,
+		nil, nil, cameraList, view.Container)
 	win.SetContent(ctr)
 
-	go web.Serve(cameras)
+	go web.Serve(data.Cameras)
 
 	win.SetCloseIntercept(func() {
-		for _, device := range cameras {
+		for _, device := range data.Cameras {
 			device.Quit <- 1
 		}
 		win.Close()
@@ -61,43 +49,4 @@ func run(win fyne.Window) {
 
 	win.Resize(fyne.NewSize(1280+250, 768+100))
 	win.ShowAndRun()
-}
-
-type ViewData struct {
-	panValue  binding.Float
-	tiltValue binding.Float
-}
-
-var viewData ViewData
-
-func newView(view fyne.CanvasObject) fyne.CanvasObject {
-	viewData.panValue = binding.NewFloat()
-	viewData.panValue.Set(90)
-	viewData.tiltValue = binding.NewFloat()
-	viewData.tiltValue.Set(50)
-
-	pan := widget.NewSliderWithData(0, 180, viewData.panValue)
-	tilt := widget.NewSliderWithData(0, 100, viewData.tiltValue)
-	tilt.Orientation = widget.Vertical
-	ctr := container.NewBorder(nil,
-		pan,
-		nil,
-		tilt,
-		view)
-
-	viewData.panValue.AddListener(binding.NewDataListener(func() {
-		value, _ := viewData.panValue.Get()
-		cmd := fmt.Sprintf(`{"entity_id": "number.pan", "value": %.0f}`, value)
-		hass.Post("services/number/set_value", cmd)
-		log.Println(value)
-	}))
-	viewData.tiltValue.AddListener(binding.NewDataListener(func() {
-		value, _ := viewData.tiltValue.Get()
-		cmd := fmt.Sprintf(`{"entity_id": "light.led_matrix_24","effect": "rainbow-vertical","brightness_pct": %.0f}`, value)
-		hass.Post("services/light/turn_on", cmd)
-		log.Println(value)
-	}))
-	pan.Hide()
-	tilt.Hide()
-	return ctr
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fynecv/appdata"
 	"fynecv/entity"
 
 	"fyne.io/fyne/v2"
@@ -8,11 +9,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func NewLightList(items []string) fyne.CanvasObject {
-	lights := entity.BuildLightList(items)
+type LightWidget struct {
+}
+
+func NewLightWidget(data *appdata.AppData) fyne.CanvasObject {
 
 	bound := binding.NewUntypedList()
-	for _, l := range lights {
+	for _, l := range data.Lights {
 		bound.Append(l)
 	}
 	list := widget.NewListWithData(

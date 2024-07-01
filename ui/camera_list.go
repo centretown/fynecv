@@ -1,9 +1,8 @@
 package ui
 
 import (
-	"fynecv/cv"
+	"fynecv/vision"
 	"image"
-	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -11,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func NewCameraList(cameras []*cv.Camera, mainHook cv.UiHook) fyne.CanvasObject {
+func NewCameraList(cameras []*vision.Camera, mainHook vision.UiHook) fyne.CanvasObject {
 	const (
 		thumbWidth  = 320
 		thumbHeight = 200
@@ -23,7 +22,6 @@ func NewCameraList(cameras []*cv.Camera, mainHook cv.UiHook) fyne.CanvasObject {
 	for _, device := range cameras {
 		device.MainHook = mainHook
 		device.ThumbHook = NewFyneHook(nil)
-		device.StreamHook = cv.NewStreamHook()
 		// device.AddFilter(classify)
 		bound.Append(device)
 	}
@@ -39,20 +37,19 @@ func NewCameraList(cameras []*cv.Camera, mainHook cv.UiHook) fyne.CanvasObject {
 		},
 		func(i binding.DataItem, o fyne.CanvasObject) {
 			d, _ := i.(binding.Untyped).Get()
-			device, _ := d.(*cv.Camera)
+			device, _ := d.(*vision.Camera)
 			device.ThumbHook.SetUi(o)
 		},
 	)
 
 	current := 0
-	cameras[current].ShowMain = true
+	cameras[current].HideMain = false
 
 	list.OnSelected = func(id widget.ListItemID) {
 		if id != current {
-			log.Println("selected", id)
-			cameras[current].RemoveMain()
+			cameras[current].HideMainCmd()
+			cameras[id].ShowMainCmd()
 			current = id
-			cameras[current].AddMain(mainHook)
 		}
 	}
 

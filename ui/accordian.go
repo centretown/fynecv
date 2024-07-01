@@ -9,6 +9,7 @@ import (
 
 func NewAccordianList(objs ...fyne.CanvasObject) fyne.CanvasObject {
 	acc := widget.NewAccordion()
+
 	for i, o := range objs {
 		text := fmt.Sprint("Item", i)
 		acc.Append(widget.NewAccordionItem(text, o))

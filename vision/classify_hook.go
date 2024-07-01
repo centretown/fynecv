@@ -1,4 +1,4 @@
-package cv
+package vision
 
 import (
 	"image/color"
@@ -16,8 +16,8 @@ var _ Hook = (*ClassifyHook)(nil)
 func NewClassifyHook() *ClassifyHook {
 	ch := &ClassifyHook{}
 	ch.classifier = gocv.NewCascadeClassifier()
-	if !ch.classifier.Load("data/haarcascade_frontalface_default.xml") {
-		log.Println("Error reading cascade file: data/haarcascade_frontalface_default.xml")
+	if !ch.classifier.Load("classifier/haarcascade_frontalface_default.xml") {
+		log.Println("Error reading cascade file: classifier/haarcascade_frontalface_default.xml")
 	}
 	return ch
 }

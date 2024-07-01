@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"fynecv/cv"
+	"fynecv/vision"
 
 	"fyne.io/fyne/v2/canvas"
 	"gocv.io/x/gocv"
@@ -11,8 +11,8 @@ type FyneHook struct {
 	imageBox *canvas.Image
 }
 
-var _ cv.Hook = (*FyneHook)(nil)
-var _ cv.UiHook = (*FyneHook)(nil)
+var _ vision.Hook = (*FyneHook)(nil)
+var _ vision.UiHook = (*FyneHook)(nil)
 
 func NewFyneHook(imageBox *canvas.Image) *FyneHook {
 	fh := &FyneHook{
