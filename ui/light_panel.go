@@ -3,94 +3,84 @@ package ui
 import (
 	"fmt"
 	"fynecv/appdata"
-	"fynecv/hass"
+	"fynecv/comm"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
-type LightPanel struct {
+type Panel struct {
 	data *appdata.AppData
 	Tabs *container.AppTabs
 }
 
-func NewLightPanel(data *appdata.AppData) *LightPanel {
-	lp := &LightPanel{
+func NewPanel(data *appdata.AppData, win fyne.Window) *Panel {
+	lp := &Panel{
 		data: data,
 		Tabs: container.NewAppTabs(),
 	}
 
 	for _, light := range data.Lights {
-
-		sel := widget.NewSelect(light.Attributes.EffectList, func(s string) {
-			cmd := fmt.Sprintf(`{"entity_id": "%s", "effect": "%s"}`,
-				light.EntityID, s)
-			hass.Post("services/light/turn_on", cmd)
-		})
-		sel.SetSelected(light.Attributes.Effect)
-
-		brightness := binding.NewFloat()
-		brightnessLabel := binding.NewSprintf("%.0f", brightness)
-		brightness.Set(light.Attributes.Brightness)
-
-		slider := widget.NewSliderWithData(0, 100, brightness)
-		brightness.AddListener(binding.NewDataListener(func() {
-			value, _ := brightness.Get()
-			cmd := fmt.Sprintf(`{"entity_id": "%s", "brightness_pct": %.0f}`,
-				light.EntityID, value)
-			hass.Post("services/light/turn_on", cmd)
-		}))
-
-		ctr := container.NewBorder(nil, nil,
-			container.NewHBox(widget.NewLabel("Effect"), sel), nil,
-			container.NewBorder(nil, nil,
-				container.NewHBox(widget.NewLabel("Brightness"),
-					widget.NewLabelWithData(brightnessLabel)),
-				nil, slider))
-		tab := container.NewTabItem(light.Attributes.Name, ctr)
-
+		tab := container.NewTabItem(light.Attributes.Name, newLightContainer(light, win))
 		lp.Tabs.Append(tab)
 	}
 	return lp
 }
 
-// 	lights := lp.data.Lights
-// 	options = make([]string, 0, len(lights))
+func newLightContainer(light *appdata.Light, win fyne.Window) *fyne.Container {
 
-// 	for _, light := range lights {
-// 		options = append(options, light.Attributes.Name)
-// 	}
+	sel := widget.NewSelect(light.Attributes.EffectList, func(s string) {
+		comm.Post("services/light/turn_on",
+			fmt.Sprintf(`{"entity_id": "%s", "effect": "%s"}`, light.EntityID, s))
+	})
+	sel.SetSelected(light.Attributes.Effect)
 
-// 	return
-// }
+	brightBound := binding.NewFloat()
+	brightValue := binding.NewSprintf("%.0f", brightBound)
+	brightBound.Set(float64(light.Attributes.Brightness))
+	brightBound.AddListener(binding.NewDataListener(func() {
+		value, _ := brightBound.Get()
+		comm.Post("services/light/turn_on",
+			fmt.Sprintf(`{"entity_id": "%s", "brightness_pct": %.0f}`,
+				light.EntityID, value))
+	}))
+	slider := widget.NewSliderWithData(0, 100, brightBound)
 
-// func (lp *LightPanel) EffectList() (options []string) {
-// 	effects := lp.data.Lights[lp.Current].Attributes.EffectList
-// 	options = make([]string, 0, len(effects))
-// 	options = append(options, effects...)
-// 	return
-// }
+	var hsv HSV
+	if len(light.Attributes.ColorHS) > 1 {
+		hsv.Hue = float32(light.Attributes.ColorHS[0])
+		hsv.Saturation = float32(light.Attributes.ColorHS[1])
+		hsv.Value = float32(light.Attributes.Brightness)
+	}
 
-// func (lp *LightPanel) onChangeEffect(s string) {
-// 	lp.Sets[lp.Current].Effect = s
-// 	cmd := fmt.Sprintf(`{"entity_id": "%s", "effect": "%s"}`,
-// 		lp.data.Lights[lp.Current].EntityID, lp.Effects.Selected)
-// 	hass.Post("services/light/turn_on", cmd)
-// }
+	patch := NewColorPatchWithColor(hsv, nil, nil)
+	patch.SetOnTapped(func() {
+		ce := NewColorPatchEditor(patch, win, func() {
+			comm.Post("services/light/turn_on",
+				fmt.Sprintf(`{"entity_id": "%s", "hs_color": [%f, %f]}`,
+					light.EntityID,
+					patch.colorHSV.Hue, patch.colorHSV.Saturation*100))
+			brightBound.Set(float64(patch.colorHSV.Value * 100))
+		})
+		ce.Dialog.Show()
+	})
 
-// func (lp *LightPanel) onChange(s string) {
-// 	lp.Current = lp.Select.SelectedIndex()
-// 	set := lp.Sets[lp.Current]
-// 	lp.Brightness.Set(set.Brightness)
-// 	lp.Effects.Options = set.Effects
-// 	lp.Effects.SetSelected(set.Effect)
-// }
+	return container.NewBorder(nil, nil,
+		container.NewHBox(
+			container.NewHBox(widget.NewIcon(EffectIcon), widget.NewLabel("Effect:"), sel),
+			container.NewHBox(widget.NewIcon(theme.ColorChromaticIcon()),
+				widget.NewLabel("Color:"), patch)),
+		nil,
+		container.NewBorder(
+			nil, nil,
+			container.NewHBox(
+				widget.NewIcon(BrightIcon),
+				widget.NewLabel("Brightness:"),
+				widget.NewLabelWithData(brightValue)),
+			nil,
+			slider))
 
-// func (lp *LightPanel) onSlide(s string) {
-// 	value, _ := lp.Brightness.Get()
-// 	lp.Sets[lp.Current].Brightness = value
-// 	cmd := fmt.Sprintf(`{"entity_id": "%s", "brightness_pct": %.0f}`,
-// 		lp.data.Lights[lp.Current].EntityID, value)
-// 	hass.Post("services/light/turn_on", cmd)
-// }
+}

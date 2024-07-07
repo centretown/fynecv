@@ -1,9 +1,9 @@
 package vision
 
-import "gocv.io/x/gocv"
+import "image"
 
 type Hook interface {
-	Update(img *gocv.Mat)
+	Update(img image.Image)
 	Close(int)
 }
 

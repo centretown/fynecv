@@ -5,11 +5,11 @@ import (
 
 	"fynecv/appdata"
 	"fynecv/ui"
-	"fynecv/web"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
 const APPID = "com.centretown.fynecv.preferences"
@@ -20,33 +20,37 @@ func main() {
 	preferences := app.Preferences()
 	theme := NewGlowTheme(preferences)
 	app.Settings().SetTheme(theme)
-	win := app.NewWindow("Cameras")
-	run(win)
+	win := app.NewWindow("Cameras+Lights+Actions")
+	run(app, win)
 }
 
-func run(win fyne.Window) {
+func run(app fyne.App, win fyne.Window) {
 	data := appdata.NewAppData()
-	view := NewView(data)
-	mainHook := ui.NewFyneHook(view.Image)
-	cameraList := ui.NewCameraList(data.Cameras, mainHook)
-	lightPanel := ui.NewLightPanel(data)
-	// accord := ui.NewAccordianList(lightList)
 
-	// vbox := container.NewVBox(cameraList, lightList)
-
+	view := ui.NewView(data)
+	cameraList := ui.NewCameraList(data, win, view)
+	cameraList.List.OnSelected = func(id widget.ListItemID) {
+		view.SetCamera(id)
+	}
+	lightPanel := ui.NewPanel(data, win)
 	ctr := container.NewBorder(lightPanel.Tabs,
-		nil, nil, cameraList, view.Container)
+		nil, nil, cameraList.Container, view.Container)
 	win.SetContent(ctr)
+	win.Resize(fyne.NewSize(1280+250, 768+100))
+	win.Show()
 
-	go web.Serve(data.Cameras)
+	for _, camera := range data.Cameras {
+		go camera.Serve()
+	}
 
 	win.SetCloseIntercept(func() {
 		for _, device := range data.Cameras {
-			device.Quit <- 1
+			if device.Busy {
+				device.Quit <- 1
+			}
 		}
 		win.Close()
 	})
 
-	win.Resize(fyne.NewSize(1280+250, 768+100))
-	win.ShowAndRun()
+	app.Run()
 }

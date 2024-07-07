@@ -1,28 +1,15 @@
-package entity
+package appdata
 
 import (
 	"encoding/json"
-	"fynecv/hass"
+	"fynecv/comm"
 	"log"
 )
-
-type Number struct {
-	State
-	Attributes struct {
-		Min   float64 `json:"min" yaml:"min"`
-		Max   float64 `json:"max" yaml:"max"`
-		Step  float64 `json:"step" yaml:"step"`
-		Mode  string  `json:"mode" yaml:"mode"`
-		Units string  `json:"unit_of_measurement" yaml:"unit_of_measurement"`
-		Name  string  `json:"friendly_name" yaml:"friendly_name"`
-	}
-	Context Context
-}
 
 func NewNumberList(entities []string) []*Number {
 	nums := make([]*Number, 0, len(entities))
 	for _, ent := range entities {
-		buf, err := hass.Get("states/" + ent)
+		buf, err := comm.Get("states/" + ent)
 		if err != nil {
 			log.Println(err, string(buf))
 			continue

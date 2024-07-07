@@ -1,8 +1,9 @@
-package hass
+package comm
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,18 +14,20 @@ const api = "/api/"
 
 func Get(cmd string) (buf []byte, err error) {
 
-	log.Printf("%s", cmd)
+	log.Printf("GET %s", cmd)
 	req, err := http.NewRequest("GET", host+api+cmd, nil)
 	if err != nil {
 		log.Println(err, "GET")
 		return
 	}
 
-	return Request(req)
+	buf, err = Request(req)
+	fmt.Println(string(buf))
+	return
 }
 
 func Post(cmd string, body string) ([]byte, error) {
-	log.Printf("%s->%s\n", cmd, body)
+	log.Printf("POST %s %s\n", cmd, body)
 	buf := bytes.NewBuffer(([]byte)(body))
 
 	req, err := http.NewRequest("POST", host+api+cmd, buf)

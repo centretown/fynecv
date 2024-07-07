@@ -1,11 +1,10 @@
 package vision
 
 import (
-	"fmt"
 	"log"
 	"time"
 
-	"gocv.io/x/gocv"
+	"github.com/mattn/go-mjpeg"
 )
 
 type Verb uint16
@@ -40,15 +39,14 @@ func (cmd Verb) String() string {
 }
 
 type CameraCmd struct {
-	Action   Verb
-	Property gocv.VideoCaptureProperties
-	Value    any
+	Action Verb
+	Value  any
 }
 
 type Camera struct {
-	ID   any
-	API  gocv.VideoCaptureAPI
-	Name string
+	URL     string
+	Name    string
+	Decoder *mjpeg.Decoder
 
 	HasPan  bool
 	HasTilt bool
@@ -59,9 +57,8 @@ type Camera struct {
 
 	recordStop time.Time
 
-	StreamHook *StreamHook
-	ThumbHook  UiHook
-	MainHook   UiHook
+	ThumbHook UiHook
+	MainHook  UiHook
 
 	Filters []Hook
 
@@ -74,29 +71,17 @@ type Camera struct {
 	FrameWidth  float64
 	FrameHeight float64
 	FrameRate   float64
-
-	video  *gocv.VideoCapture
-	writer *gocv.VideoWriter
-
-	matrix gocv.Mat
 }
 
-func NewCamera(id any, api gocv.VideoCaptureAPI) *Camera {
-	name, ok := id.(string)
-	if !ok {
-		num, _ := id.(int)
-		name = fmt.Sprintf("V4L-%02d", num)
-	}
+func NewCamera(url string) *Camera {
 
 	cam := &Camera{
-		ID:         id,
-		API:        api,
-		Name:       name,
-		Quit:       make(chan int),
-		Record:     make(chan int),
-		Cmd:        make(chan CameraCmd),
-		StreamHook: NewStreamHook(),
-		Filters:    make([]Hook, 0),
+		URL:     url,
+		Name:    url,
+		Quit:    make(chan int),
+		Record:  make(chan int),
+		Cmd:     make(chan CameraCmd),
+		Filters: make([]Hook, 0),
 
 		FrameWidth:  1280,
 		FrameHeight: 720,
@@ -133,90 +118,42 @@ func (cam *Camera) ShowMainCmd() {
 }
 
 func (cam *Camera) Open() (err error) {
-	var (
-		useAPI = cam.API > 0
-	)
-	if useAPI {
-		cam.video, err = gocv.OpenVideoCaptureWithAPI(cam.ID, cam.API)
-	} else {
-		cam.video, err = gocv.OpenVideoCapture(cam.ID)
-	}
-
+	cam.Decoder, err = mjpeg.NewDecoderFromURL(cam.URL)
 	if err != nil {
-		log.Println(err, cam.ID, "OpenVideoCapture")
-		return
+		log.Println("NewDecoderFromURL", err)
 	}
-
-	if useAPI {
-		cam.video.Set(gocv.VideoCaptureFPS, cam.FrameRate)
-		cam.video.Set(gocv.VideoCaptureFrameHeight, cam.FrameHeight)
-		cam.video.Set(gocv.VideoCaptureFrameWidth, cam.FrameWidth)
-	}
-
-	cam.FrameWidth = cam.video.Get(gocv.VideoCaptureFrameWidth)
-	cam.FrameHeight = cam.video.Get(gocv.VideoCaptureFrameHeight)
-	cam.FrameRate = cam.video.Get(gocv.VideoCaptureFPS)
-	log.Printf("Opened '%s' Size: %.0fx%.0f FPS: %.0f\n", cam.Name, cam.FrameWidth, cam.FrameHeight, cam.FrameRate)
 	return
 }
 
 func (cam *Camera) Close() {
-	if cam.writer != nil && cam.writer.IsOpened() {
-		cam.writer.Close()
-	}
-	cam.StreamHook.Close(0)
 	cam.MainHook.Close(0)
 	cam.ThumbHook.Close(0)
-	cam.matrix.Close()
-	cam.video.Close()
 	log.Printf("Closed '%s'\n", cam.Name)
 }
 
 const (
-	delayNormal    = time.Millisecond * 20
+	delayNormal    = time.Millisecond * 1
 	delayRetry     = time.Second
 	delayHibernate = time.Second * 30
 	recordLimit    = time.Minute
 )
 
 func (cam *Camera) stopRecording() {
-	if cam.writer.IsOpened() {
-		cam.writer.Close()
-	}
 	cam.Recording = false
 }
 
 func (cam *Camera) startRecording() {
-	var err error
 
 	if cam.Recording {
 		return
 	}
 
-	if cam.writer.IsOpened() {
-		cam.writer.Close()
-	}
-
-	now := time.Now()
-	file_name := fmt.Sprintf("record_%d_%d_%d_%d_%d.mp4", now.Year(), now.YearDay(), now.Hour(), now.Minute(), now.Second())
-	cam.writer, err = gocv.VideoWriterFile(file_name, "H264", 10, 1260, 720, true)
-
-	if err != nil {
-		log.Println("start recording", err)
-		return
-	}
-
-	cam.Recording = true
-	cam.recordStop = time.Now().Add(recordLimit)
 }
 
 func (cam *Camera) doCmd(cmd CameraCmd) {
 	switch cmd.Action {
 	case GET:
-		cmd.Value = cam.video.Get(cmd.Property)
 	case SET:
-		f, _ := cmd.Value.(float64)
-		cam.video.Set(cmd.Property, float64(f))
 	case HIDEMAIN:
 		b, _ := cmd.Value.(bool)
 		cam.HideMain = b
@@ -239,8 +176,7 @@ func (cam *Camera) Serve() {
 	}
 
 	var (
-		cmd   CameraCmd
-		retry int = 0
+		cmd CameraCmd
 	)
 
 	err := cam.Open()
@@ -249,18 +185,14 @@ func (cam *Camera) Serve() {
 	}
 
 	cam.Busy = true
-
 	defer func() {
 		cam.Busy = false
 		cam.Close()
 	}()
 
 	var (
-		delay      = delayNormal
-		recordStop = time.Now()
+		delay = delayNormal
 	)
-
-	cam.matrix = gocv.NewMat()
 
 	for {
 		time.Sleep(delay)
@@ -278,46 +210,19 @@ func (cam *Camera) Serve() {
 			continue
 		}
 
-		if !cam.video.Read(&cam.matrix) {
-			if retry > 10 {
-				delay = delayHibernate
-			} else {
-				delay = delayRetry
-			}
+		img, err := cam.Decoder.Decode()
 
-			log.Printf("%v is unavailable, attempts=%d next in %.0f seconds\n",
-				cam.ID, retry, delay.Seconds())
-			retry++
-			// cam.Close()
-			cam.Open()
+		if err != nil {
+			log.Println(err)
 			continue
 		}
 
-		retry = 0
-
-		if cam.matrix.Empty() {
-			continue
+		if cam.MainHook != nil && !cam.HideMain {
+			cam.MainHook.Update(img)
 		}
-
-		for _, filter := range cam.Filters {
-			filter.Update(&cam.matrix)
+		if cam.ThumbHook != nil && !cam.HideThumb {
+			cam.ThumbHook.Update(img)
 		}
-
-		if !cam.HideMain {
-			cam.MainHook.Update(&cam.matrix)
-		}
-		if !cam.HideThumb {
-			cam.ThumbHook.Update(&cam.matrix)
-		}
-
-		if cam.Recording && cam.writer.IsOpened() {
-			cam.writer.Write(cam.matrix)
-			if recordStop.After(time.Now()) {
-				cam.doCmd(CameraCmd{Action: RECORD_STOP})
-			}
-		}
-
-		cam.StreamHook.Update(&cam.matrix)
 	}
 
 }

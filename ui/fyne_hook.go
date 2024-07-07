@@ -2,9 +2,9 @@ package ui
 
 import (
 	"fynecv/vision"
+	"image"
 
 	"fyne.io/fyne/v2/canvas"
-	"gocv.io/x/gocv"
 )
 
 type FyneHook struct {
@@ -23,8 +23,8 @@ func NewFyneHook(imageBox *canvas.Image) *FyneHook {
 
 func (fh *FyneHook) Close(int) {}
 
-func (fh *FyneHook) Update(mat *gocv.Mat) {
-	if img, err := mat.ToImage(); err == nil {
+func (fh *FyneHook) Update(img image.Image) {
+	if fh.imageBox != nil {
 		fh.imageBox.Image = img
 		fh.imageBox.Refresh()
 	}

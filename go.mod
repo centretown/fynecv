@@ -4,8 +4,9 @@ go 1.22.3
 
 require (
 	fyne.io/fyne/v2 v2.4.5
-	github.com/hybridgroup/mjpeg v0.0.0-20140228234708-4680f319790e
-	gocv.io/x/gocv v0.37.0
+	github.com/mattn/go-mjpeg v0.0.3
+	gopkg.in/yaml.v3 v3.0.1
+	nhooyr.io/websocket v1.8.11
 )
 
 require (
@@ -34,6 +35,5 @@ require (
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/js/dom v0.0.0-20210725211120-f030747120f2 // indirect
 )
