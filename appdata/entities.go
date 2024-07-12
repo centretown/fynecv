@@ -1,6 +1,7 @@
 package appdata
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -11,11 +12,17 @@ type Response struct {
 
 type Result struct {
 	Response
-	Success bool           `json:"success" yaml:"success"`
-	Result  []*Entity[any] `json:"result" yaml:"result"`
+	Success bool `json:"success" yaml:"success"`
+	// Entities []*Entity[json.RawMessage] `json:"result" yaml:"result"`
 }
 
-type DataEntityID struct {
+type StateResult struct {
+	Response
+	Success  bool                       `json:"success" yaml:"success"`
+	Entities []*Entity[json.RawMessage] `json:"result" yaml:"result"`
+}
+
+type DataState struct {
 	EntityID string `json:"entity_id" yaml:"entity_id"`
 }
 
@@ -48,6 +55,10 @@ type LightEventResult struct {
 	EventResult[LightAttributes]
 }
 
+type EntityStore struct {
+	Entity[json.RawMessage]
+}
+
 type Entity[T any] struct {
 	EntityID     string    `json:"entity_id" yaml:"entity_id"`
 	State        string    `json:"state" yaml:"state"`
@@ -69,10 +80,6 @@ type LightAttributes struct {
 	ColorHS    []float64 `json:"hs_color" yaml:"hs_color"`
 }
 
-type Light struct {
-	Entity[LightAttributes]
-}
-
 type NumberAttributes struct {
 	Min   float64 `json:"min" yaml:"min"`
 	Max   float64 `json:"max" yaml:"max"`
@@ -82,13 +89,74 @@ type NumberAttributes struct {
 	Name  string  `json:"friendly_name" yaml:"friendly_name"`
 }
 
-type Number struct {
-	Entity[NumberAttributes]
+// weather.forecast_home
+type WeatherAttributes struct {
+	Attribution       string  `json:"attribution" yaml:"attribution"`
+	CloudCoverage     float64 `json:"cloud_coverage" yaml:"cloud_coverage"`
+	DewPoint          float64 `json:"dew_point" yaml:"dew_point"`
+	Name              string  `json:"friendly_name" yaml:"friendly_name"`
+	Humidity          float64 `json:"humidity" yaml:"humidity"`
+	PrecipitationUnit string  `json:"precipitation_unit" yaml:"precipitation_unit"`
+	Pressure          float64 `json:"pressure" yaml:"pressure"`
+	PressureUnit      string  `json:"pressure_unit" yaml:"pressure_unit"`
+	SupportedFeatures int     `json:"supported_features" yaml:"supported_features"`
+	Temperature       float64 `json:"temperature" yaml:"temperature"`
+	TemperatureUnit   string  `json:"temperature_unit" yaml:"temperature_unit"`
+	VisibilityUnit    string  `json:"visibility_unit" yaml:"visibility_unit"`
+	WindBearing       float64 `json:"wind_bearing" yaml:"wind_bearing"`
+	WindSpeed         float64 `json:"wind_speed" yaml:"wind_speed"`
+	WindSpeedUnit     string  `json:"wind_speed_unit" yaml:"wind_speed_unit"`
 }
+
+// sensor.wifi_signal_28
 
 type SensorAttributes struct {
 	StateClass  string `json:"state_class" yaml:"state_class"`
 	Units       string `json:"unit_of_measurement" yaml:"unit_of_measurement"`
 	DeviceClass string `json:"device_class" yaml:"device_class"`
 	Name        string `json:"friendly_name" yaml:"friendly_name"`
+}
+
+type ZoneAttributes struct {
+	Latitude  float64  `json:"latitude" yaml:"latitude"`
+	Longitude float64  `json:"longitude" yaml:"longitude"`
+	Radius    float64  `json:"radius" yaml:"radius"`
+	Passive   bool     `json:"passive" yaml:"passive"`
+	Persons   []string `json:"persons" yaml:"persons"`
+	Editable  bool     `json:"editable" yaml:"editable"`
+	Icon      string   `json:"icon" yaml:"icon"`
+	Name      string   `json:"friendly_name" yaml:"friendly_name"`
+}
+
+type Light struct {
+	Entity[LightAttributes]
+}
+type Number struct {
+	Entity[NumberAttributes]
+}
+type Weather struct {
+	Entity[WeatherAttributes]
+}
+type Wifi struct {
+	Entity[SensorAttributes]
+}
+type Any struct {
+	Entity[any]
+}
+type Zone struct {
+	Entity[ZoneAttributes]
+}
+
+type Consumer interface {
+	Copy(src *Entity[json.RawMessage])
+}
+
+func (dst *Entity[T]) Copy(src *Entity[json.RawMessage]) {
+	dst.EntityID = src.EntityID
+	dst.State = src.State
+	dst.LastChanged = src.LastChanged
+	dst.LastUpdated = src.LastUpdated
+	dst.LastReported = src.LastReported
+	dst.Context = src.Context
+	json.Unmarshal(src.Attributes, &dst.Attributes)
 }

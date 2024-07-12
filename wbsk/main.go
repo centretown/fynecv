@@ -6,6 +6,8 @@ import (
 	"log"
 	"strconv"
 	"time"
+
+	"fyne.io/fyne/v2/data/binding"
 )
 
 func main() {
@@ -25,10 +27,14 @@ func main() {
 	log.Println("Will run for", seconds, "seconds.")
 
 	data := appdata.NewAppData()
+	data.Ready.AddListener(binding.NewDataListener(func() {
+		isLoaded, _ := data.Ready.Get()
+		if isLoaded {
+			log.Println("DATA LOADED", isLoaded)
+		}
+	}))
 	data.Monitor()
 
-	timr := time.NewTimer(time.Second * time.Duration(seconds))
-	<-timr.C
-
+	<-time.NewTimer(time.Second * time.Duration(seconds)).C
 	data.StopMonitor()
 }

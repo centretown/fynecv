@@ -52,12 +52,13 @@ const BUFFER_SIZE = 1024 * 32
 func (hs *WebSockClient) Read() ([]byte, error) {
 	var readBuffer []byte = make([]byte, BUFFER_SIZE)
 
-	typ, rdrConn, err := hs.conn.Reader(hs.ctx)
+	_, rdrConn, err := hs.conn.Reader(hs.ctx)
+	// typ, rdrConn, err := hs.conn.Reader(hs.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("Type", typ)
+	// log.Println("Type", typ)
 	rdr := bufio.NewReaderSize(rdrConn, BUFFER_SIZE)
 
 	for {
@@ -68,7 +69,7 @@ func (hs *WebSockClient) Read() ([]byte, error) {
 		}
 
 		if count > 0 {
-			log.Println("read count", count)
+			// log.Println("read count", count)
 			return readBuffer[:count], nil
 		}
 	}
@@ -84,12 +85,14 @@ func (hs *WebSockClient) Write(cmd string) error {
 	return err
 }
 
-func (hs *WebSockClient) WriteID(cmd string) {
-	log.Println(cmd)
-	idCmd := fmt.Sprintf(cmd, hs.MessageID)
+func (hs *WebSockClient) WriteID(cmd string) (id int, err error) {
+	id = hs.MessageID
+	message := fmt.Sprintf(cmd, id)
+	log.Println(message)
 	hs.MessageID++
-	err := hs.conn.Write(hs.ctx, websocket.MessageText, []byte(idCmd))
+	err = hs.conn.Write(hs.ctx, websocket.MessageText, []byte(message))
 	if err != nil {
 		log.Println(err)
 	}
+	return
 }

@@ -25,6 +25,8 @@ type ColorPatchEditor struct {
 	value        binding.Float
 	unused       binding.Bool
 	removeButton *widget.Button
+
+	hsv HSV
 }
 
 func NewColorPatchEditor(source *ColorPatch,
@@ -32,7 +34,7 @@ func NewColorPatchEditor(source *ColorPatch,
 
 	pe := &ColorPatchEditor{
 		source:   source,
-		patch:    NewColorPatchWithColor(source.GetHSVColor(), func() {}, func() {}),
+		patch:    NewColorPatchWithColor(source.ColorRGB, func() {}, func() {}),
 		window:   window,
 		onUpdate: onUpdate,
 
@@ -89,32 +91,38 @@ func NewColorPatchEditor(source *ColorPatch,
 
 func (pe *ColorPatchEditor) setFields() {
 	pe.unused.Set(pe.patch.unused)
-	pe.hue.Set(float64(pe.patch.colorHSV.Hue))
-	pe.saturation.Set(float64(pe.patch.colorHSV.Saturation) * 100)
-	pe.value.Set(float64(pe.patch.colorHSV.Value * 100))
+	pe.hsv.FromRGB(pe.patch.ColorRGB)
+	pe.hue.Set(float64(pe.hsv.Hue))
+	pe.saturation.Set(float64(pe.hsv.Saturation) * 100)
+	pe.value.Set(float64(pe.hsv.Value * 100))
+}
+
+func (pe *ColorPatchEditor) GetHSVColor() (hsv HSV) {
+	hsv.FromRGB(pe.patch.ColorRGB)
+	return
 }
 
 func (pe *ColorPatchEditor) setHue() {
 	h, _ := pe.hue.Get()
-	hsv := pe.patch.GetHSVColor()
+	hsv := pe.GetHSVColor()
 	hsv.Hue = float32(h)
-	pe.setColor(hsv)
+	pe.setHSVColor(hsv)
 }
 func (pe *ColorPatchEditor) setSaturation() {
 	s, _ := pe.saturation.Get()
-	hsv := pe.patch.GetHSVColor()
+	hsv := pe.GetHSVColor()
 	hsv.Saturation = float32(s / 100)
-	pe.setColor(hsv)
+	pe.setHSVColor(hsv)
 }
 func (pe *ColorPatchEditor) setValue() {
 	v, _ := pe.value.Get()
-	hsv := pe.patch.GetHSVColor()
+	hsv := pe.GetHSVColor()
 	hsv.Value = float32(v / 100)
-	pe.setColor(hsv)
+	pe.setHSVColor(hsv)
 }
 
-func (pe *ColorPatchEditor) setColor(hsv HSV) {
-	pe.patch.SetHSVColor(hsv)
+func (pe *ColorPatchEditor) setHSVColor(hsv HSV) {
+	pe.patch.ColorRGB = hsv.ToRGB()
 }
 
 func (pe *ColorPatchEditor) remove() {
@@ -132,7 +140,9 @@ func (le *ColorPatchEditor) selectColorPicker(patch *ColorPatch) func() {
 	return func() {
 		picker := dialog.NewColorPicker("Color Picker", "color", func(c color.Color) {
 			if c != patch.GetColor() {
-				patch.SetColor(c)
+				r, g, b, a := c.RGBA()
+				patch.ColorRGB = color.NRGBA{R: uint8(r), G: uint8(g),
+					B: uint8(b), A: uint8(a)}
 			}
 		}, le.window)
 		picker.Advanced = true

@@ -28,7 +28,7 @@ type ColorPatch struct {
 	onChanged  func() `json:"-"`
 	rectangle  *canvas.Rectangle
 	background *canvas.Rectangle
-	colorHSV   HSV
+	ColorRGB   color.NRGBA
 
 	hovered, focused bool
 	unused           bool
@@ -37,21 +37,20 @@ type ColorPatch struct {
 }
 
 func NewColorPatch() (patch *ColorPatch) {
-	var hsv HSV
-	hsv.FromColor(theme.DisabledColor())
-	patch = NewColorPatchWithColor(hsv, nil, nil)
+	patch = NewColorPatchWithColor(color.NRGBA{R: 127, G: 127, B: 127, A: 255}, nil, nil)
 	patch.unused = true
 	return
 }
 
-func NewColorPatchWithColor(hsv HSV, onTapped func(), onChanged func()) *ColorPatch {
+func NewColorPatchWithColor(rgb color.NRGBA, onTapped func(), onChanged func()) *ColorPatch {
 	cp := &ColorPatch{
-		background: canvas.NewRectangle(theme.ButtonColor()),
-		rectangle:  canvas.NewRectangle(hsv.ToRGB()),
-		onChanged:  onChanged,
-		onTapped:   onTapped,
+		ColorRGB:  rgb,
+		rectangle: canvas.NewRectangle(rgb),
+		background: canvas.NewRectangle(color.NRGBA{
+			R: rgb.R / 2, G: rgb.G / 2, B: rgb.B / 2, A: 36}),
+		onChanged: onChanged,
+		onTapped:  onTapped,
 	}
-	cp.colorHSV = hsv
 	cp.ExtendBaseWidget(cp)
 	return cp
 }
@@ -62,19 +61,21 @@ func (cp *ColorPatch) applyPatchTheme() {
 }
 
 func (cp *ColorPatch) backgroundColor() (c color.Color) {
-	switch {
-	case cp.focused:
-		c = theme.FocusColor()
-	case cp.hovered:
-		c = theme.HoverColor()
-	default:
-		c = theme.ButtonColor()
-	}
+	r, g, b, a := cp.GetColor().RGBA()
+	c = color.NRGBA{R: uint8(r / 2), G: uint8(g / 2), B: uint8(b / 2), A: uint8(a)}
+	// switch {
+	// case cp.focused:
+	// 	c = theme.FocusColor()
+	// case cp.hovered:
+	// 	c = theme.HoverColor()
+	// default:
+	// 	c = theme.ButtonColor()
+	// }
 	return
 }
 
 func (cp *ColorPatch) copy() string {
-	buf, err := json.Marshal(cp.colorHSV)
+	buf, err := json.Marshal(cp.ColorRGB)
 	if err != nil {
 		return ""
 	}
@@ -87,13 +88,13 @@ func (cp *ColorPatch) paste(s string) {
 	}
 
 	b := []byte(s)
-	var hsv HSV
-	err := json.Unmarshal(b, &hsv)
+	var rgb color.NRGBA
+	err := json.Unmarshal(b, &rgb)
 	if err != nil {
 		return
 	}
+	cp.ColorRGB = rgb
 	cp.setChanged()
-	cp.SetHSVColor(hsv)
 }
 
 func (cp *ColorPatch) setChanged() {
@@ -186,34 +187,23 @@ func (cp *ColorPatch) Unused() bool {
 	return cp.unused
 }
 
-func (cp *ColorPatch) GetHSVColor() HSV {
-	return cp.colorHSV
+func (cp *ColorPatch) GetColor() color.Color {
+	return cp.ColorRGB
 }
 
-func (cp *ColorPatch) GetColor() color.Color {
-	return cp.rectangle.FillColor
+func (cp *ColorPatch) SetColor(c color.NRGBA) {
+	cp.ColorRGB = c
+	cp.setFill(c)
 }
 
 func (cp *ColorPatch) CopyPatch(source *ColorPatch) {
 	cp.unused = source.unused
-	cp.colorHSV = source.colorHSV
+	cp.ColorRGB = source.ColorRGB
 	if cp.unused {
 		cp.SetUnused(true)
 	} else {
-		cp.setFill(cp.colorHSV.ToRGB())
+		cp.setFill(cp.ColorRGB)
 	}
-}
-
-func (cp *ColorPatch) SetHSVColor(hsv HSV) {
-	cp.unused = false
-	cp.colorHSV = hsv
-	cp.setFill(hsv.ToRGB())
-}
-
-func (cp *ColorPatch) SetColor(color color.Color) {
-	cp.unused = false
-	cp.colorHSV.FromColor(color)
-	cp.setFill(color)
 }
 
 func (cp *ColorPatch) setFill(color color.Color) {

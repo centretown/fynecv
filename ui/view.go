@@ -23,15 +23,16 @@ type BindingData struct {
 }
 
 type View struct {
-	Data        *appdata.AppData
-	Binder      BindingData
-	Container   *fyne.Container
-	Image       *canvas.Image
-	Pan         *widget.Slider
-	Tilt        *widget.Slider
-	Current     int
-	MainHook    vision.UiHook
-	IsRecording bool
+	Data           *appdata.AppData
+	Binder         BindingData
+	Container      *fyne.Container
+	Image          *canvas.Image
+	Pan            *widget.Slider
+	Tilt           *widget.Slider
+	Current        int
+	MainHook       vision.UiHook
+	IsRecording    bool
+	RecordDuration int
 }
 
 const (
@@ -47,7 +48,8 @@ func NewView(data *appdata.AppData) *View {
 			Pan:  binding.NewFloat(),
 			Tilt: binding.NewFloat(),
 		},
-		Image: canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 1280, 720))),
+		Image:          canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 1280, 720))),
+		RecordDuration: 300,
 	}
 
 	mv.Pan = widget.NewSliderWithData(0, 180, mv.Binder.Pan)
@@ -71,7 +73,8 @@ func NewView(data *appdata.AppData) *View {
 		} else {
 			recordButton.SetIcon(MotionOffIcon)
 			recordButton.SetText(msgStopRecording)
-			resp, err = http.Get("http://192.168.0.7:9000/record?duration=60")
+			req := fmt.Sprintf("http://192.168.0.7:9000/record?duration=%d", mv.RecordDuration)
+			resp, err = http.Get(req)
 		}
 
 		if err != nil {

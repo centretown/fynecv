@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"fynecv/appdata"
 	"fynecv/comm"
+	"image/color"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -31,6 +32,7 @@ func NewPanel(data *appdata.AppData, win fyne.Window) *Panel {
 }
 
 func newLightContainer(light *appdata.Light, win fyne.Window) *fyne.Container {
+	appdata.ShowYaml(light)
 
 	sel := widget.NewSelect(light.Attributes.EffectList, func(s string) {
 		comm.Post("services/light/turn_on",
@@ -39,31 +41,51 @@ func newLightContainer(light *appdata.Light, win fyne.Window) *fyne.Container {
 	sel.SetSelected(light.Attributes.Effect)
 
 	brightBound := binding.NewFloat()
-	brightValue := binding.NewSprintf("%.0f", brightBound)
+	slider := widget.NewSliderWithData(0, 255, brightBound)
 	brightBound.Set(float64(light.Attributes.Brightness))
+	v, _ := brightBound.Get()
+	fmt.Println("bound brightness", v)
 	brightBound.AddListener(binding.NewDataListener(func() {
-		value, _ := brightBound.Get()
-		comm.Post("services/light/turn_on",
-			fmt.Sprintf(`{"entity_id": "%s", "brightness_pct": %.0f}`,
-				light.EntityID, value))
+		v, _ := brightBound.Get()
+		fmt.Println("bound brightness", v)
 	}))
-	slider := widget.NewSliderWithData(0, 100, brightBound)
 
-	var hsv HSV
-	if len(light.Attributes.ColorHS) > 1 {
-		hsv.Hue = float32(light.Attributes.ColorHS[0])
-		hsv.Saturation = float32(light.Attributes.ColorHS[1])
-		hsv.Value = float32(light.Attributes.Brightness)
+	brightValue := binding.NewSprintf("%.0f", brightBound)
+	// brightBound.AddListener(binding.NewDataListener(func() {
+	// 	value, _ := brightBound.Get()
+	// 	fmt.Println("bound value", value)
+	// 	comm.Post("services/light/turn_on",
+	// 		fmt.Sprintf(`{"entity_id": "%s", "brightness_pct": %.0f}`,
+	// 			light.EntityID, value))
+	// }))
+
+	var (
+		hsv HSV
+		rgb color.NRGBA
+	)
+	if len(light.Attributes.ColorRGB) > 2 {
+		rgb.R = light.Attributes.ColorRGB[0]
+		rgb.G = light.Attributes.ColorRGB[1]
+		rgb.B = light.Attributes.ColorRGB[2]
+		rgb.A = 255
+
+		hsv.FromColor(rgb)
+		appdata.ShowYaml(rgb)
+		appdata.ShowYaml(hsv)
+
+		// hsv.Hue = float32(light.Attributes.ColorHS[0])
+		// hsv.Saturation = float32(light.Attributes.ColorHS[1]) / 100
+		// hsv.Value = float32(light.Attributes.Brightness) / 255 * 100
 	}
 
-	patch := NewColorPatchWithColor(hsv, nil, nil)
+	patch := NewColorPatchWithColor(rgb, nil, nil)
 	patch.SetOnTapped(func() {
 		ce := NewColorPatchEditor(patch, win, func() {
+			rgb := patch.ColorRGB
 			comm.Post("services/light/turn_on",
-				fmt.Sprintf(`{"entity_id": "%s", "hs_color": [%f, %f]}`,
+				fmt.Sprintf(`{"entity_id": "%s", "rgb_color": [%d, %d, %d]}`,
 					light.EntityID,
-					patch.colorHSV.Hue, patch.colorHSV.Saturation*100))
-			brightBound.Set(float64(patch.colorHSV.Value * 100))
+					rgb.R, rgb.G, rgb.B))
 		})
 		ce.Dialog.Show()
 	})

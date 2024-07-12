@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"log"
+	"os"
 
 	"fynecv/appdata"
 	"fynecv/ui"
@@ -9,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -26,7 +29,25 @@ func main() {
 
 func run(app fyne.App, win fyne.Window) {
 	data := appdata.NewAppData()
+	data.Monitor()
 
+	wait := make(chan int)
+
+	data.Ready.AddListener(binding.NewDataListener(func() {
+		ready, _ := data.Ready.Get()
+		if ready {
+			log.Println("STATE LOADED")
+		}
+
+		if data.Err != nil {
+			log.Fatal(data.Err)
+			os.Exit(1)
+		}
+
+		wait <- 1
+	}))
+
+	<-wait
 	view := ui.NewView(data)
 	cameraList := ui.NewCameraList(data, win, view)
 	cameraList.List.OnSelected = func(id widget.ListItemID) {
