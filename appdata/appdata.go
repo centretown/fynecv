@@ -16,7 +16,7 @@ type AppData struct {
 	Lights       []*Light
 	Actions      []*Number
 	Entities     map[string]*Entity[json.RawMessage]
-	client       *comm.WebSockClient
+	sock         *comm.WebSockClient
 	stop         chan int
 	loadStatesID int
 	eventsID     int
@@ -46,7 +46,7 @@ func NewAppData() *AppData {
 	}
 
 	var err error
-	data.client, err = comm.NewWebSockClient()
+	data.sock, err = comm.NewWebSockClient()
 	if err != nil {
 		log.Println("NewAppData", err)
 	}
@@ -74,7 +74,7 @@ func (data *AppData) Consume(entityID string, newState *Entity[json.RawMessage])
 }
 
 func (data *AppData) CallService(cmd string) (int, error) {
-	return data.client.WriteID(cmd)
+	return data.sock.WriteID(cmd)
 }
 
 func (data *AppData) getRaw(entityID string) (ent *Entity[json.RawMessage]) {
@@ -146,33 +146,60 @@ func (data *AppData) StopMonitor() {
 	data.stop <- 1
 }
 
-func (data *AppData) Monitor() {
-	hs, err := comm.NewWebSockClient()
-	if err != nil {
-		log.Fatal(err, "Dial")
+func (data *AppData) LoadState() {
+}
+
+func (data *AppData) Monitor() error {
+
+	defer func() {
+		if data.Err != nil {
+			log.Println(data.Err, "Monitor")
+		}
+	}()
+
+	data.sock, data.Err = comm.NewWebSockClient()
+	if data.Err != nil {
+		return data.Err
 	}
 
-	data.client = hs
-
-	cmd := fmt.Sprintf(auth, Token)
 	// authorize
-	hs.Write(cmd)
-	buf, _ := hs.Read()
+	var buf []byte
+	cmd := fmt.Sprintf(auth, comm.Token)
+	data.Err = data.sock.Write(cmd)
+	if data.Err != nil {
+		return data.Err
+	}
+
+	buf, data.Err = data.sock.Read()
+	if data.Err != nil {
+		return data.Err
+	}
 	log.Println(buf, "AUTH1")
-	hs.Write(cmd)
-	buf, _ = hs.Read()
+	data.Err = data.sock.Write(cmd)
+	if data.Err != nil {
+		return data.Err
+	}
+	buf, data.Err = data.sock.Read()
+	if data.Err != nil {
+		return data.Err
+	}
 	log.Println(buf, "AUTH 2")
 
 	go data.monitor()
-	data.loadStatesID, _ = hs.WriteID(states)
+
+	data.loadStatesID, _ = data.sock.WriteID(states)
 	data.loaded.AddListener(binding.NewDataListener(func() {
 		isLoaded, _ := data.loaded.Get()
 		if isLoaded {
 			data.LoadLists()
-			data.eventsID, _ = hs.WriteID(subscribe)
+			data.eventsID, data.Err = data.sock.WriteID(subscribe)
+			if data.Err != nil {
+				return
+			}
 			data.Ready.Set(true)
 		}
 	}))
+	return data.Err
 }
 
 func (data *AppData) monitor() {
@@ -187,7 +214,7 @@ func (data *AppData) monitor() {
 		case <-data.stop:
 			return
 		default:
-			buf, err := data.client.Read()
+			buf, err := data.sock.Read()
 			if err != nil {
 				errCount++
 				if errCount > 10 {

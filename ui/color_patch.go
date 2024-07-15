@@ -28,7 +28,7 @@ type ColorPatch struct {
 	onChanged  func() `json:"-"`
 	rectangle  *canvas.Rectangle
 	background *canvas.Rectangle
-	ColorRGB   color.NRGBA
+	FillColor  color.NRGBA
 
 	hovered, focused bool
 	unused           bool
@@ -42,12 +42,12 @@ func NewColorPatch() (patch *ColorPatch) {
 	return
 }
 
-func NewColorPatchWithColor(rgb color.NRGBA, onTapped func(), onChanged func()) *ColorPatch {
+func NewColorPatchWithColor(fill color.NRGBA, onTapped func(), onChanged func()) *ColorPatch {
 	cp := &ColorPatch{
-		ColorRGB:  rgb,
-		rectangle: canvas.NewRectangle(rgb),
+		FillColor: fill,
+		rectangle: canvas.NewRectangle(fill),
 		background: canvas.NewRectangle(color.NRGBA{
-			R: rgb.R / 2, G: rgb.G / 2, B: rgb.B / 2, A: 36}),
+			R: fill.R / 2, G: fill.G / 2, B: fill.B / 2, A: 36}),
 		onChanged: onChanged,
 		onTapped:  onTapped,
 	}
@@ -75,7 +75,7 @@ func (cp *ColorPatch) backgroundColor() (c color.Color) {
 }
 
 func (cp *ColorPatch) copy() string {
-	buf, err := json.Marshal(cp.ColorRGB)
+	buf, err := json.Marshal(cp.FillColor)
 	if err != nil {
 		return ""
 	}
@@ -93,7 +93,7 @@ func (cp *ColorPatch) paste(s string) {
 	if err != nil {
 		return
 	}
-	cp.ColorRGB = rgb
+	cp.FillColor = rgb
 	cp.setChanged()
 }
 
@@ -188,21 +188,21 @@ func (cp *ColorPatch) Unused() bool {
 }
 
 func (cp *ColorPatch) GetColor() color.Color {
-	return cp.ColorRGB
+	return cp.FillColor
 }
 
 func (cp *ColorPatch) SetColor(c color.NRGBA) {
-	cp.ColorRGB = c
+	cp.FillColor = c
 	cp.setFill(c)
 }
 
 func (cp *ColorPatch) CopyPatch(source *ColorPatch) {
 	cp.unused = source.unused
-	cp.ColorRGB = source.ColorRGB
+	cp.FillColor = source.FillColor
 	if cp.unused {
 		cp.SetUnused(true)
 	} else {
-		cp.setFill(cp.ColorRGB)
+		cp.setFill(cp.FillColor)
 	}
 }
 

@@ -3,106 +3,141 @@ package ui
 import (
 	"fmt"
 	"fynecv/appdata"
-	"fynecv/comm"
+	"fynecv/svc"
 	"image/color"
+	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
-type Panel struct {
-	data *appdata.AppData
-	Tabs *container.AppTabs
-}
-
-func NewPanel(data *appdata.AppData, win fyne.Window) *Panel {
-	lp := &Panel{
-		data: data,
-		Tabs: container.NewAppTabs(),
-	}
-
-	for _, light := range data.Lights {
-		tab := container.NewTabItem(light.Attributes.Name, newLightContainer(light, win))
-		lp.Tabs.Append(tab)
-	}
-	return lp
-}
-
-func newLightContainer(light *appdata.Light, win fyne.Window) *fyne.Container {
-	appdata.ShowYaml(light)
-
-	sel := widget.NewSelect(light.Attributes.EffectList, func(s string) {
-		comm.Post("services/light/turn_on",
-			fmt.Sprintf(`{"entity_id": "%s", "effect": "%s"}`, light.EntityID, s))
-	})
-	sel.SetSelected(light.Attributes.Effect)
-
-	brightBound := binding.NewFloat()
-	slider := widget.NewSliderWithData(0, 255, brightBound)
-	brightBound.Set(float64(light.Attributes.Brightness))
-	v, _ := brightBound.Get()
-	fmt.Println("bound brightness", v)
-	brightBound.AddListener(binding.NewDataListener(func() {
-		v, _ := brightBound.Get()
-		fmt.Println("bound brightness", v)
-	}))
-
-	brightValue := binding.NewSprintf("%.0f", brightBound)
-	// brightBound.AddListener(binding.NewDataListener(func() {
-	// 	value, _ := brightBound.Get()
-	// 	fmt.Println("bound value", value)
-	// 	comm.Post("services/light/turn_on",
-	// 		fmt.Sprintf(`{"entity_id": "%s", "brightness_pct": %.0f}`,
-	// 			light.EntityID, value))
-	// }))
-
+func NewLightPanel(entityID string, win fyne.Window, data *appdata.AppData) *fyne.Container {
 	var (
-		hsv HSV
-		rgb color.NRGBA
+		light            appdata.Light
+		fromSubscription bool
+		brightValue      int
+		effect           string
+		red, green, blue uint8
 	)
-	if len(light.Attributes.ColorRGB) > 2 {
-		rgb.R = light.Attributes.ColorRGB[0]
-		rgb.G = light.Attributes.ColorRGB[1]
-		rgb.B = light.Attributes.ColorRGB[2]
-		rgb.A = 255
-
-		hsv.FromColor(rgb)
-		appdata.ShowYaml(rgb)
-		appdata.ShowYaml(hsv)
-
-		// hsv.Hue = float32(light.Attributes.ColorHS[0])
-		// hsv.Saturation = float32(light.Attributes.ColorHS[1]) / 100
-		// hsv.Value = float32(light.Attributes.Brightness) / 255 * 100
+	nrgba := func(c color.Color) color.NRGBA {
+		r, g, b, a := c.RGBA()
+		return color.NRGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: uint8(a)}
 	}
 
-	patch := NewColorPatchWithColor(rgb, nil, nil)
+	patch := NewColorPatch()
+	sel := widget.NewSelect([]string{}, nil)
+
+	brightPct := binding.NewFloat()
+	brightText := binding.FloatToStringWithFormat(brightPct, "%3.0f%%")
+	brightLabel := widget.NewLabelWithData(brightText)
+	slider := widget.NewSlider(0, 100)
+
+	sel.OnChanged = func(s string) {
+		if !fromSubscription {
+			effect = s
+			dataMap := make(map[string]string)
+			dataMap["effect"] = fmt.Sprintf(`"%s"`, effect)
+			cmd := svc.LightCmd(entityID, dataMap)
+			_, err := data.CallService(cmd)
+			if err != nil {
+				log.Println(err, "CallService")
+			}
+		}
+		fromSubscription = false
+	}
+
+	slider.OnChangeEnded = func(f float64) {
+		if !fromSubscription {
+			err := brightPct.Set(f)
+			if err != nil {
+				log.Println(err, "CallService")
+			}
+			v, err := brightPct.Get()
+			if err != nil {
+				log.Println(err, v, "CallService")
+			}
+			b, err := brightText.Get()
+			if err != nil {
+				log.Println(err, b, "CallService")
+			}
+			log.Println("slider", f, "pct", v, "pcttext", b, "CallService")
+
+			brightValue = int(f) * 255 / 100
+			dataMap := make(map[string]string)
+			dataMap["brightness"] = fmt.Sprintf("%d", brightValue)
+			cmd := svc.LightCmd(entityID, dataMap)
+			_, err = data.CallService(cmd)
+			if err != nil {
+				log.Println(err, "CallService")
+			}
+		}
+		fromSubscription = false
+	}
+
 	patch.SetOnTapped(func() {
-		ce := NewColorPatchEditor(patch, win, func() {
-			rgb := patch.ColorRGB
-			comm.Post("services/light/turn_on",
-				fmt.Sprintf(`{"entity_id": "%s", "rgb_color": [%d, %d, %d]}`,
-					light.EntityID,
-					rgb.R, rgb.G, rgb.B))
-		})
-		ce.Dialog.Show()
+		picker := dialog.NewColorPicker("Color Picker", "color", func(c color.Color) {
+			rgb := nrgba(c)
+			if red != rgb.R || green != rgb.G || blue != rgb.B {
+				red, green, blue = rgb.R, rgb.G, rgb.B
+				patch.SetColor(rgb)
+				fmt.Println("patch.FillColor", patch.FillColor)
+				dataMap := make(map[string]string)
+				dataMap["rgb_color"] = fmt.Sprintf("[%d,%d,%d]", red, green, blue)
+				cmd := svc.LightCmd(entityID, dataMap)
+				_, err := data.CallService(cmd)
+				if err != nil {
+					log.Println(err, "CallService")
+				}
+			}
+		}, win)
+		picker.Advanced = true
+		picker.SetColor(patch.GetColor())
+		picker.Show()
 	})
+
+	data.Subscribe(entityID,
+		appdata.NewSubcription(&light.Entity, func(c appdata.Consumer) {
+			if light.Attributes.Brightness != brightValue {
+				fromSubscription = true
+				brightValue = light.Attributes.Brightness
+				v := float64(brightValue) * 100 / 255
+
+				brightPct.Set(v)
+				slider.SetValue(v)
+			}
+			if light.Attributes.Effect != effect {
+				fromSubscription = true
+				effect = light.Attributes.Effect
+				sel.Options = light.Attributes.EffectList
+				sel.SetSelected(effect)
+			}
+
+			rgb := light.Attributes.ColorRGB
+			if len(rgb) > 2 {
+				if red != rgb[0] || green != rgb[1] || blue != rgb[2] {
+					red, green, blue = rgb[0], rgb[1], rgb[2]
+					patch.SetColor(color.NRGBA{R: red, G: green, B: blue, A: 255})
+					patch.Refresh()
+				}
+			}
+			log.Println("Refresh")
+		}))
 
 	return container.NewBorder(nil, nil,
 		container.NewHBox(
-			container.NewHBox(widget.NewIcon(EffectIcon), widget.NewLabel("Effect:"), sel),
-			container.NewHBox(widget.NewIcon(theme.ColorChromaticIcon()),
-				widget.NewLabel("Color:"), patch)),
-		nil,
-		container.NewBorder(
-			nil, nil,
-			container.NewHBox(
-				widget.NewIcon(BrightIcon),
-				widget.NewLabel("Brightness:"),
-				widget.NewLabelWithData(brightValue)),
-			nil,
-			slider))
+			// widget.NewIcon(EffectIcon),
+			widget.NewLabel("Effect:"),
+			sel,
+			widget.NewIcon(theme.ColorChromaticIcon()),
+			widget.NewLabel("Color:"),
+			patch,
+			// widget.NewIcon(BrightIcon),
+			brightLabel,
+		),
 
+		nil, slider)
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -34,7 +35,7 @@ func NewColorPatchEditor(source *ColorPatch,
 
 	pe := &ColorPatchEditor{
 		source:   source,
-		patch:    NewColorPatchWithColor(source.ColorRGB, func() {}, func() {}),
+		patch:    NewColorPatchWithColor(source.FillColor, func() {}, func() {}),
 		window:   window,
 		onUpdate: onUpdate,
 
@@ -44,6 +45,7 @@ func NewColorPatchEditor(source *ColorPatch,
 		unused:     binding.NewBool(),
 	}
 
+	pe.setFields()
 	pe.patch.Editing = true
 
 	hueLabel := widget.NewLabelWithData(binding.FloatToStringWithFormat(pe.hue, "%3.0f"))
@@ -63,7 +65,6 @@ func NewColorPatchEditor(source *ColorPatch,
 
 	pickerButton := widget.NewButtonWithIcon("Pick", theme.MoreHorizontalIcon(),
 		pe.selectColorPicker(pe.patch))
-	pe.setFields()
 	pe.removeButton = widget.NewButtonWithIcon("Cut", theme.ContentCutIcon(),
 		pe.remove)
 
@@ -90,15 +91,16 @@ func NewColorPatchEditor(source *ColorPatch,
 }
 
 func (pe *ColorPatchEditor) setFields() {
-	pe.unused.Set(pe.patch.unused)
-	pe.hsv.FromRGB(pe.patch.ColorRGB)
+	pe.hsv.FromRGB(pe.patch.FillColor)
+	fmt.Println("setfields", pe.hsv.Hue, pe.hsv.Saturation)
 	pe.hue.Set(float64(pe.hsv.Hue))
 	pe.saturation.Set(float64(pe.hsv.Saturation) * 100)
-	pe.value.Set(float64(pe.hsv.Value * 100))
+	pe.value.Set(float64(pe.hsv.Value) * 100)
+	pe.unused.Set(pe.patch.unused)
 }
 
 func (pe *ColorPatchEditor) GetHSVColor() (hsv HSV) {
-	hsv.FromRGB(pe.patch.ColorRGB)
+	hsv.FromRGB(pe.patch.FillColor)
 	return
 }
 
@@ -122,7 +124,7 @@ func (pe *ColorPatchEditor) setValue() {
 }
 
 func (pe *ColorPatchEditor) setHSVColor(hsv HSV) {
-	pe.patch.ColorRGB = hsv.ToRGB()
+	pe.patch.FillColor = hsv.ToRGB()
 }
 
 func (pe *ColorPatchEditor) remove() {
@@ -141,7 +143,7 @@ func (le *ColorPatchEditor) selectColorPicker(patch *ColorPatch) func() {
 		picker := dialog.NewColorPicker("Color Picker", "color", func(c color.Color) {
 			if c != patch.GetColor() {
 				r, g, b, a := c.RGBA()
-				patch.ColorRGB = color.NRGBA{R: uint8(r), G: uint8(g),
+				patch.FillColor = color.NRGBA{R: uint8(r), G: uint8(g),
 					B: uint8(b), A: uint8(a)}
 			}
 		}, le.window)
