@@ -77,9 +77,9 @@ func (hs *WebSockClient) Read() ([]byte, error) {
 }
 
 func (hs *WebSockClient) Write(cmd string) error {
-	log.Println(cmd)
 	err := hs.conn.Write(hs.ctx, websocket.MessageText, []byte(cmd))
 	if err != nil {
+		log.Println(cmd)
 		log.Println(err)
 	}
 	return err
@@ -88,10 +88,10 @@ func (hs *WebSockClient) Write(cmd string) error {
 func (hs *WebSockClient) WriteID(cmd string) (id int, err error) {
 	id = hs.MessageID
 	message := fmt.Sprintf(cmd, id)
-	log.Println(message)
 	hs.MessageID++
 	err = hs.conn.Write(hs.ctx, websocket.MessageText, []byte(message))
 	if err != nil {
+		log.Println(message)
 		log.Println(err)
 	}
 	return

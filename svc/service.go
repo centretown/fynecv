@@ -7,10 +7,15 @@ var (
 	idstr         = `"id":%d }`
 )
 
-func ServiceCmd(domain string, service string, entityID string, data map[string]string) string {
+type ServiceData struct {
+	Key   string
+	Value string
+}
+
+func ServiceCmd(domain string, service string, entityID string, sd ...ServiceData) string {
 	var serviceData string
-	for k, v := range data {
-		serviceData += fmt.Sprintf(`"%s":%s,`, k, v)
+	for _, s := range sd {
+		serviceData += fmt.Sprintf(`"%s":%s,`, s.Key, s.Value)
 	}
 	if len(serviceData) > 0 {
 		serviceData = serviceData[:len(serviceData)-1]
@@ -19,8 +24,10 @@ func ServiceCmd(domain string, service string, entityID string, data map[string]
 	return cmd
 }
 
-//cmd := svc.ServiceCmd("light", "turn_on", entityID, d)
+func LightCmd(entityID string, serviceData ...ServiceData) string {
+	return ServiceCmd("light", "turn_on", entityID, serviceData...)
+}
 
-func LightCmd(entityID string, data map[string]string) string {
-	return ServiceCmd("light", "turn_on", entityID, data)
+func NumberCmd(entityID string, serviceData ...ServiceData) string {
+	return ServiceCmd("number", "set_value", entityID, serviceData...)
 }

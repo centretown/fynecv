@@ -46,12 +46,12 @@ func setup(win fyne.Window) *appdata.AppData {
 	view := ui.NewView(data)
 	lightPanel := ui.NewPanel(data, win)
 
-	data.GetReady()
-
 	cameraList := ui.NewCameraList(data, win, view)
 	cameraList.List.OnSelected = func(id widget.ListItemID) {
 		view.SetCamera(id)
 	}
+
+	data.GetReady()
 
 	ctr := container.NewBorder(lightPanel.Tabs,
 		nil, nil, cameraList.Container, view.Container)

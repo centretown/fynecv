@@ -51,6 +51,7 @@ func NewColorPatchWithColor(fill color.NRGBA, onTapped func(), onChanged func())
 		onChanged: onChanged,
 		onTapped:  onTapped,
 	}
+	// cp.rectangle
 	cp.ExtendBaseWidget(cp)
 	return cp
 }

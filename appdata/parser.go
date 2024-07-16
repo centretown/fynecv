@@ -2,7 +2,6 @@ package appdata
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"gopkg.in/yaml.v3"
@@ -45,7 +44,7 @@ func (data *AppData) parseResult(buf []byte) {
 			data.Consume(entity.EntityID, entity)
 		}
 		data.loaded.Set(true)
-	} else {
+	} else if !result.Success {
 		ShowYaml(result)
 	}
 }
@@ -86,5 +85,5 @@ func ShowYaml(entity any) {
 		log.Println("Marshal yaml", err)
 		return
 	}
-	fmt.Println(string(out))
+	log.Println(string(out))
 }

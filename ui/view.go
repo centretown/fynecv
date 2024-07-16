@@ -3,7 +3,7 @@ package ui
 import (
 	"fmt"
 	"fynecv/appdata"
-	"fynecv/comm"
+	"fynecv/svc"
 	"fynecv/vision"
 	"image"
 	"io"
@@ -13,22 +13,13 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
 )
 
-type BindingData struct {
-	Pan  binding.Float
-	Tilt binding.Float
-}
-
 type View struct {
 	Data           *appdata.AppData
-	Binder         BindingData
 	Container      *fyne.Container
 	Image          *canvas.Image
-	Pan            *widget.Slider
-	Tilt           *widget.Slider
 	Current        int
 	MainHook       vision.UiHook
 	IsRecording    bool
@@ -43,21 +34,72 @@ const (
 func NewView(data *appdata.AppData) *View {
 
 	mv := &View{
-		Data: data,
-		Binder: BindingData{
-			Pan:  binding.NewFloat(),
-			Tilt: binding.NewFloat(),
-		},
+		Data:           data,
 		Image:          canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 1280, 720))),
 		RecordDuration: 300,
 	}
 
-	mv.Pan = widget.NewSliderWithData(0, 180, mv.Binder.Pan)
-	mv.Tilt = widget.NewSliderWithData(0, 180, mv.Binder.Tilt)
-	mv.Bind()
+	var (
+		panValue, tiltValue   float64
+		panNumber, tiltNumber appdata.Number
+	)
+
+	fromSubscription := false
+	onChangeEnded := func(f float64, entityID string) {
+		if !fromSubscription {
+			data.CallService(svc.NumberCmd(entityID, svc.ServiceData{
+				Key:   "value",
+				Value: fmt.Sprintf("%.0f", f),
+			}))
+		}
+		fromSubscription = false
+
+	}
+
+	panSlider := widget.NewSlider(0, 180)
+	panSlider.OnChangeEnded = func(f float64) {
+		panValue = f
+		onChangeEnded(f, "number.pan")
+	}
+
+	tiltSlider := widget.NewSlider(0, 180)
+	tiltSlider.Orientation = widget.Vertical
+	tiltSlider.OnChangeEnded = func(f float64) {
+		tiltValue = f
+		onChangeEnded(f, "number.tilt")
+	}
+
+	data.Subscribe("number.pan",
+		appdata.NewSubcription(&panNumber.Entity, func(c appdata.Consumer) {
+			var f float64
+			_, err := fmt.Sscanf(panNumber.State, "%f", &f)
+			if err != nil {
+				log.Println(err, "pan state")
+				return
+			}
+			if f != panValue {
+				panValue = f
+				fromSubscription = true
+				panSlider.SetValue(panValue)
+			}
+		}))
+
+	data.Subscribe("number.tilt",
+		appdata.NewSubcription(&tiltNumber.Entity, func(c appdata.Consumer) {
+			var f float64
+			_, err := fmt.Sscanf(panNumber.State, "%f", &f)
+			if err != nil {
+				log.Println(err, "tilt state")
+				return
+			}
+			if f != tiltValue {
+				tiltValue = f
+				fromSubscription = true
+				tiltSlider.SetValue(tiltValue)
+			}
+		}))
 
 	mv.Image.FillMode = canvas.ImageFillContain
-	mv.Tilt.Orientation = widget.Vertical
 	recordButton := widget.NewButtonWithIcon(msgStartRecording, MotionOnIcon, func() {})
 
 	recordButton.OnTapped = func() {
@@ -93,13 +135,13 @@ func NewView(data *appdata.AppData) *View {
 		recordButton.Refresh()
 	}
 
-	bottom := container.NewBorder(nil, nil, recordButton, nil, mv.Pan)
+	bottom := container.NewBorder(nil, nil, recordButton, nil, panSlider)
 
 	mv.Container = container.NewBorder(
 		nil,
 		bottom,
 		nil,
-		mv.Tilt,
+		tiltSlider,
 		mv.Image)
 
 	mv.MainHook = NewFyneHook(mv.Image)
@@ -114,22 +156,22 @@ func NewView(data *appdata.AppData) *View {
 	return mv
 }
 
-func (view *View) Bind() {
-	view.Binder.Pan.Set(140)
-	// view.Binder.Tilt.Set(50)
+// func (view *View) Bind() {
+// 	view.Binder.Pan.Set(140)
+// 	// view.Binder.Tilt.Set(50)
 
-	view.Binder.Pan.AddListener(binding.NewDataListener(func() {
-		value, _ := view.Binder.Pan.Get()
-		cmd := fmt.Sprintf(`{"entity_id": "number.pan", "value": %.0f}`, value)
-		comm.Post("services/number/set_value", cmd)
-	}))
-	view.Binder.Tilt.AddListener(binding.NewDataListener(func() {
-		value, _ := view.Binder.Tilt.Get()
-		cmd := fmt.Sprintf(`{"entity_id": "number.tilt", "value": %.0f}`, value)
-		comm.Post("services/number/set_value", cmd)
-	}))
+// 	view.Binder.Pan.AddListener(binding.NewDataListener(func() {
+// 		value, _ := view.Binder.Pan.Get()
+// 		cmd := fmt.Sprintf(`{"entity_id": "number.pan", "value": %.0f}`, value)
+// 		comm.Post("services/number/set_value", cmd)
+// 	}))
+// 	view.Binder.Tilt.AddListener(binding.NewDataListener(func() {
+// 		value, _ := view.Binder.Tilt.Get()
+// 		cmd := fmt.Sprintf(`{"entity_id": "number.tilt", "value": %.0f}`, value)
+// 		comm.Post("services/number/set_value", cmd)
+// 	}))
 
-}
+// }
 
 func (view *View) SetCamera(id int) {
 	cameras := view.Data.Cameras
