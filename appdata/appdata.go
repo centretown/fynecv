@@ -6,6 +6,8 @@ import (
 	"fynecv/comm"
 	"fynecv/vision"
 	"log"
+	"slices"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2/data/binding"
@@ -28,8 +30,8 @@ type AppData struct {
 func NewAppData() *AppData {
 	var data = &AppData{
 		Cameras: []*vision.Camera{
-			vision.NewCamera("http://192.168.0.7:9000/"),
-			vision.NewCamera("http://192.168.0.7:9000/1/"),
+			vision.NewCamera("http://192.168.0.7:9000/", "", ""),
+			vision.NewCamera("http://192.168.0.7:9000/1/", "number.pan", "number.tilt"),
 		},
 
 		Entities: make(map[string]*Entity[json.RawMessage]),
@@ -64,9 +66,31 @@ func (data *AppData) Consume(entityID string, newState *Entity[json.RawMessage])
 	subs, ok := data.subscriptions[entityID]
 	if ok {
 		for _, sub := range subs {
-			sub.Consume(newState)
+			if sub.Enabled {
+				sub.Consume(newState)
+			}
 		}
 	}
+}
+
+func (data *AppData) EntityList(filters ...string) (list []string) {
+	list = make([]string, 0)
+	all := len(filters) == 0
+	// list = make([]string, 0, len(data.Entities))
+	for k := range data.Entities {
+		if all {
+			list = append(list, k)
+			continue
+		}
+		for _, s := range filters {
+			if strings.HasPrefix(k, s) {
+				list = append(list, k)
+				break
+			}
+		}
+	}
+	slices.Sort(list)
+	return
 }
 
 func (data *AppData) CallService(cmd string) {

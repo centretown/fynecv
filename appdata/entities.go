@@ -140,7 +140,7 @@ type Weather struct {
 type Wifi struct {
 	Entity[SensorAttributes]
 }
-type Any struct {
+type AnyData struct {
 	Entity[any]
 }
 type Zone struct {

@@ -28,7 +28,7 @@ func main() {
 
 	win.SetCloseIntercept(func() {
 		for _, device := range data.Cameras {
-			if device.Busy {
+			if device.Active {
 				device.Quit <- 1
 			}
 		}
@@ -43,8 +43,8 @@ func setup(win fyne.Window) *appdata.AppData {
 	// data := appdata.NewAppData()
 	data := appdata.NewAppData()
 
-	view := ui.NewView(data)
-	lightPanel := ui.NewPanel(data, win)
+	view := ui.NewCameraView(data)
+	tabs := ui.NewTabs(data, win)
 
 	cameraList := ui.NewCameraList(data, win, view)
 	cameraList.List.OnSelected = func(id widget.ListItemID) {
@@ -53,8 +53,10 @@ func setup(win fyne.Window) *appdata.AppData {
 
 	data.GetReady()
 
-	ctr := container.NewBorder(lightPanel.Tabs,
-		nil, nil, cameraList.Container, view.Container)
+	// spl := container.NewHSplit(view.Container, cameraList.Container)
+
+	ctr := container.NewBorder(tabs,
+		nil, nil, cameraList.List, view.Container)
 	win.SetContent(ctr)
 
 	for _, camera := range data.Cameras {

@@ -48,8 +48,8 @@ type Camera struct {
 	Name    string
 	Decoder *mjpeg.Decoder
 
-	HasPan  bool
-	HasTilt bool
+	PanID  string
+	TiltID string
 
 	Quit   chan int
 	Record chan int
@@ -65,7 +65,7 @@ type Camera struct {
 	HideMain  bool
 	HideThumb bool
 	HideAll   bool
-	Busy      bool
+	Active    bool
 	Recording bool
 
 	FrameWidth  float64
@@ -73,7 +73,7 @@ type Camera struct {
 	FrameRate   float64
 }
 
-func NewCamera(url string) *Camera {
+func NewCamera(url string, panID, tiltID string) *Camera {
 
 	cam := &Camera{
 		URL:     url,
@@ -88,6 +88,8 @@ func NewCamera(url string) *Camera {
 		FrameRate:   20,
 		HideMain:    true,
 		HideThumb:   false,
+		PanID:       panID,
+		TiltID:      tiltID,
 		// writer:      &gocv.VideoWriter{},
 	}
 
@@ -109,11 +111,11 @@ func (cam *Camera) StopRecordCmd() {
 	cam.Command(CameraCmd{Action: RECORD_STOP, Value: true})
 }
 
-func (cam *Camera) HideMainCmd() {
+func (cam *Camera) DisableMain() {
 	cam.Command(CameraCmd{Action: HIDEMAIN, Value: true})
 }
 
-func (cam *Camera) ShowMainCmd() {
+func (cam *Camera) EnableMain() {
 	cam.Command(CameraCmd{Action: HIDEMAIN, Value: false})
 }
 
@@ -171,7 +173,7 @@ func (cam *Camera) doCmd(cmd CameraCmd) {
 }
 
 func (cam *Camera) Serve() {
-	if cam.Busy {
+	if cam.Active {
 		return
 	}
 
@@ -184,9 +186,9 @@ func (cam *Camera) Serve() {
 		return
 	}
 
-	cam.Busy = true
+	cam.Active = true
 	defer func() {
-		cam.Busy = false
+		cam.Active = false
 		cam.Close()
 	}()
 
