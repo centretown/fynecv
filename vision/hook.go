@@ -3,8 +3,8 @@ package vision
 import "image"
 
 type Hook interface {
-	Update(img image.Image)
-	Close(int)
+	UpdateHook(img image.Image)
+	CloseHook(int)
 }
 
 type UiHook interface {

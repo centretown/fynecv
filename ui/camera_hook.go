@@ -21,9 +21,9 @@ func NewCameraHook(imageBox *canvas.Image) *CameraHook {
 	return fh
 }
 
-func (fh *CameraHook) Close(int) {}
+func (fh *CameraHook) CloseHook(int) {}
 
-func (fh *CameraHook) Update(img image.Image) {
+func (fh *CameraHook) UpdateHook(img image.Image) {
 	if fh.imageBox != nil {
 		fh.imageBox.Image = img
 		fh.imageBox.Refresh()

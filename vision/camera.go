@@ -128,8 +128,8 @@ func (cam *Camera) Open() (err error) {
 }
 
 func (cam *Camera) Close() {
-	cam.MainHook.Close(0)
-	cam.ThumbHook.Close(0)
+	cam.MainHook.CloseHook(0)
+	cam.ThumbHook.CloseHook(0)
 	log.Printf("Closed '%s'\n", cam.Name)
 }
 
@@ -220,10 +220,10 @@ func (cam *Camera) Serve() {
 		}
 
 		if cam.MainHook != nil && !cam.HideMain {
-			cam.MainHook.Update(img)
+			cam.MainHook.UpdateHook(img)
 		}
 		if cam.ThumbHook != nil && !cam.HideThumb {
-			cam.ThumbHook.Update(img)
+			cam.ThumbHook.UpdateHook(img)
 		}
 	}
 

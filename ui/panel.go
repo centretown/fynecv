@@ -21,11 +21,10 @@ type AddTab struct {
 func newAddTab() *AddTab {
 	atab := &AddTab{
 		sel: widget.NewSelect([]string{}, func(s string) {}),
-		btn: widget.NewButton("Go", func() {}),
+		btn: widget.NewButton("Select Entity", func() {}),
 	}
 	atab.ctr = container.NewBorder(nil, nil,
-		widget.NewLabel("Select Entity:"),
-		atab.btn, atab.sel)
+		atab.btn, nil, atab.sel)
 
 	return atab
 }
